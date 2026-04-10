@@ -39,6 +39,7 @@ export const DSR_LIMITS = {
 
 export const MAX_ADMIN_FEE_SAR = 5000;
 export const DEFAULT_ADMIN_FEE_RATE = 0.01;
+export const MAX_CONSUMER_LOAN_MONTHS = 60;
 
 export function calculateAdminFee(loanAmount: number, feeRate = DEFAULT_ADMIN_FEE_RATE): number {
   const calculated = loanAmount * feeRate;

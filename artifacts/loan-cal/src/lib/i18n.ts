@@ -81,6 +81,18 @@ export const translations = {
     aprInfo: "المعدل السنوي الفعلي (APR) يشمل جميع الرسوم والتكاليف",
     adminFeeInfo: "رسوم الإدارة: 1% من مبلغ التمويل بحد أقصى 5,000 ريال",
 
+    // Max eligibility
+    maxEligibilityTitle: "الحد الأقصى للأهلية",
+    maxEligibilityLabel: "أقصى مبلغ يمكنك الاقتراضه",
+    maxMonthlyInstallment: "أقصى قسط شهري مسموح",
+    exceedsDsrWarning: "يتجاوز الحد الأقصى لنسبة DSR وفق أنظمة ساما",
+    maxTermNote: "الحد الأقصى للقرض الاستهلاكي هو 60 شهراً",
+    dsrUsed: "من حد DSR مستخدم",
+    dsrRemaining: "متبقٍ من حد DSR",
+    eligibilityBasedOn: "بناءً على:",
+    dsrRuleEmployee: "33.33% من الراتب الشهري",
+    dsrRuleRetiree: "25% من راتب التقاعد",
+
     // Currency
     sar: "ر.س",
     currency: "ريال سعودي",
@@ -157,6 +169,18 @@ export const translations = {
     dsrInfo: "DSR: Total monthly obligations must not exceed 33.33% of salary (employees) or 25% (retirees)",
     aprInfo: "The Effective APR includes all fees and costs",
     adminFeeInfo: "Admin fee: 1% of loan amount, max SAR 5,000",
+
+    // Max eligibility
+    maxEligibilityTitle: "Max Eligibility",
+    maxEligibilityLabel: "Maximum amount you can borrow",
+    maxMonthlyInstallment: "Max allowed monthly installment",
+    exceedsDsrWarning: "Exceeds SAMA's maximum DSR limit",
+    maxTermNote: "Consumer loan max term is 60 months",
+    dsrUsed: "of DSR limit used",
+    dsrRemaining: "DSR capacity remaining",
+    eligibilityBasedOn: "Based on:",
+    dsrRuleEmployee: "33.33% of monthly salary",
+    dsrRuleRetiree: "25% of pension salary",
 
     sar: "SAR",
     currency: "Saudi Riyal",
