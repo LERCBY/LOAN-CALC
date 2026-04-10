@@ -25,3 +25,21 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Artifacts
+
+### Loan CAL (`artifacts/loan-cal`)
+- **Type**: react-vite web app
+- **Preview path**: `/`
+- **Description**: SAMA-compliant Financial Loan Calculator
+- **Stack**: React + Vite + Tailwind CSS + Recharts + Lucide icons
+- **Features**:
+  - Bilingual Arabic/English with RTL support
+  - DSR (Debt Service Ratio) calculation per SAMA regulations (33.33% employees / 25% retirees)
+  - APR calculation including admin fees (1% or max SAR 5,000)
+  - Max eligible loan amount calculation
+  - Principal vs. interest pie chart + monthly breakdown bar chart
+  - Amortization schedule table with pagination
+  - localStorage persistence for personal data
+  - Dark/light mode toggle
+  - Mobile-responsive design
