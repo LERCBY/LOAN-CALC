@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Clock, Trash2, AlertCircle, CheckCircle, ChevronRight, ChevronLeft, Inbox } from "lucide-react";
+import { Clock, Trash2, AlertCircle, CheckCircle, ChevronRight, ChevronLeft, Inbox, Building2, Landmark } from "lucide-react";
 import type { Lang } from "@/lib/i18n";
 import { loadHistory, clearHistory, deleteHistoryEntry, formatHistoryDate } from "@/lib/history";
 import type { HistoryEntry } from "@/lib/history";

@@ -1,4 +1,4 @@
-import { formatSAR } from "@/lib/loanCalculations";
+import type { SectorType } from "@/lib/loanCalculations";
 
 const HISTORY_KEY = "loan-calc-history";
 const MAX_HISTORY = 20;
@@ -10,12 +10,15 @@ export interface HistoryEntry {
   annualRate: number;
   durationMonths: number;
   employeeType: "employee" | "retiree";
+  sectorType: SectorType;
+  mortgageMode: boolean;
   monthlyInstallment: number;
   totalRepayment: number;
   totalInterest: number;
   effectiveAPR: number;
   isDsrCompliant: boolean;
   dsrRatio: number;
+  dsrLimit: number;
   maxEligibleAmount: number;
   salary: number;
 }

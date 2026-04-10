@@ -1,3 +1,6 @@
+export type EmployeeType = "employee" | "retiree";
+export type SectorType = "private" | "public";
+
 export interface LoanInputs {
   salary: number;
   totalDebt: number;
@@ -5,7 +8,9 @@ export interface LoanInputs {
   loanAmount: number;
   annualRate: number;
   durationMonths: number;
-  employeeType: "employee" | "retiree";
+  employeeType: EmployeeType;
+  sectorType: SectorType;
+  mortgageMode: boolean;
   adminFeeRate?: number;
 }
 
@@ -22,6 +27,8 @@ export interface LoanResults {
   principalPercentage: number;
   interestPercentage: number;
   amortizationSchedule: AmortizationEntry[];
+  sectorType: SectorType;
+  mortgageMode: boolean;
 }
 
 export interface AmortizationEntry {
@@ -32,18 +39,34 @@ export interface AmortizationEntry {
   balance: number;
 }
 
+// ── DSR Limits ────────────────────────────────────────────────────────────
+// SAMA rules:
+//   • Retirees → always 25% regardless of sector
+//   • Private sector employees → 33.33%
+//   • Public sector employees (standard) → 33.33%
+//   • Public sector employees (mortgage/advanced) → 45%
 export const DSR_LIMITS = {
   employee: 33.33,
   retiree: 25.0,
-};
+  publicMortgage: 45.0,
+} as const;
+
+export function getDSRLimit(
+  employeeType: EmployeeType,
+  sectorType: SectorType,
+  mortgageMode: boolean
+): number {
+  if (employeeType === "retiree") return DSR_LIMITS.retiree;
+  if (sectorType === "public" && mortgageMode) return DSR_LIMITS.publicMortgage;
+  return DSR_LIMITS.employee;
+}
 
 export const MAX_ADMIN_FEE_SAR = 5000;
 export const DEFAULT_ADMIN_FEE_RATE = 0.01;
 export const MAX_CONSUMER_LOAN_MONTHS = 60;
 
 export function calculateAdminFee(loanAmount: number, feeRate = DEFAULT_ADMIN_FEE_RATE): number {
-  const calculated = loanAmount * feeRate;
-  return Math.min(calculated, MAX_ADMIN_FEE_SAR);
+  return Math.min(loanAmount * feeRate, MAX_ADMIN_FEE_SAR);
 }
 
 export function calculateMonthlyPayment(
@@ -64,23 +87,14 @@ export function calculateAPR(
 ): number {
   const netLoan = loanAmount - adminFee;
   if (netLoan <= 0) return 0;
-  let low = 0;
-  let high = 200;
-  let mid = 0;
+  let low = 0, high = 200, mid = 0;
   for (let i = 0; i < 200; i++) {
     mid = (low + high) / 2;
     const r = mid / 100 / 12;
-    let pv = 0;
-    if (r === 0) {
-      pv = monthlyPayment * months;
-    } else {
-      pv = monthlyPayment * (1 - Math.pow(1 + r, -months)) / r;
-    }
-    if (pv > netLoan) {
-      low = mid;
-    } else {
-      high = mid;
-    }
+    const pv = r === 0
+      ? monthlyPayment * months
+      : monthlyPayment * (1 - Math.pow(1 + r, -months)) / r;
+    if (pv > netLoan) low = mid; else high = mid;
     if (Math.abs(pv - netLoan) < 0.001) break;
   }
   return mid;
@@ -100,7 +114,6 @@ export function buildAmortizationSchedule(
     const interestPaid = balance * r;
     const principalPaid = payment - interestPaid;
     balance = Math.max(0, balance - principalPaid);
-
     schedule.push({
       month: m,
       payment: Number(payment.toFixed(2)),
@@ -109,7 +122,6 @@ export function buildAmortizationSchedule(
       balance: Number(balance.toFixed(2)),
     });
   }
-
   return schedule;
 }
 
@@ -118,16 +130,19 @@ export function calculateMaxEligibleAmount(
   existingObligations: number,
   annualRate: number,
   months: number,
-  employeeType: "employee" | "retiree"
+  employeeType: EmployeeType,
+  sectorType: SectorType = "private",
+  mortgageMode = false
 ): number {
-  const limit = DSR_LIMITS[employeeType] / 100;
+  const limit = getDSRLimit(employeeType, sectorType, mortgageMode) / 100;
   const maxMonthlyPayment = salary * limit - existingObligations;
   if (maxMonthlyPayment <= 0) return 0;
 
   const r = annualRate / 100 / 12;
   if (r === 0) return maxMonthlyPayment * months;
 
-  const maxPrincipal = (maxMonthlyPayment * (Math.pow(1 + r, months) - 1)) / (r * Math.pow(1 + r, months));
+  const maxPrincipal = (maxMonthlyPayment * (Math.pow(1 + r, months) - 1)) /
+    (r * Math.pow(1 + r, months));
   return Math.max(0, Math.floor(maxPrincipal));
 }
 
@@ -139,25 +154,23 @@ export function calculate(inputs: LoanInputs): LoanResults {
     annualRate,
     durationMonths,
     employeeType,
+    sectorType,
+    mortgageMode,
     adminFeeRate = DEFAULT_ADMIN_FEE_RATE,
   } = inputs;
+
+  const dsrLimit = getDSRLimit(employeeType, sectorType, mortgageMode);
 
   const adminFee = calculateAdminFee(loanAmount, adminFeeRate);
   const monthlyInstallment = calculateMonthlyPayment(loanAmount, annualRate, durationMonths);
   const totalRepayment = monthlyInstallment * durationMonths;
   const totalInterest = totalRepayment - loanAmount;
-
   const effectiveAPR = calculateAPR(loanAmount, monthlyInstallment, durationMonths, adminFee);
 
   const maxEligibleAmount = calculateMaxEligibleAmount(
-    salary,
-    monthlyObligations,
-    annualRate,
-    durationMonths,
-    employeeType
+    salary, monthlyObligations, annualRate, durationMonths, employeeType, sectorType, mortgageMode
   );
 
-  const dsrLimit = DSR_LIMITS[employeeType];
   const totalObligation = monthlyObligations + monthlyInstallment;
   const dsrRatio = salary > 0 ? (totalObligation / salary) * 100 : 0;
   const isDsrCompliant = dsrRatio <= dsrLimit;
@@ -180,6 +193,8 @@ export function calculate(inputs: LoanInputs): LoanResults {
     principalPercentage: Number(principalPercentage.toFixed(1)),
     interestPercentage: Number(interestPercentage.toFixed(1)),
     amortizationSchedule,
+    sectorType,
+    mortgageMode,
   };
 }
 
