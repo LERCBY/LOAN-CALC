@@ -1,11 +1,11 @@
 {
   "name": "LOAN CALC.",
   "short_name": "LOAN CALC.",
-  "description": "SAMA-compliant financial loan calculator — حاسبة التمويل",
+  "description": "SAMA-compliant financial loan calculator — حاسبة التمويل وفق أنظمة ساما",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F6B3D",
-  "theme_color": "#0F6B3D",
+  "background_color": "#967BB6",
+  "theme_color": "#967BB6",
   "orientation": "portrait",
   "icons": [
     {

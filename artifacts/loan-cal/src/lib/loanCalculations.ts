@@ -1,5 +1,7 @@
-export type EmployeeType = "employee" | "retiree";
-export type SectorType = "private" | "public";
+// ── Enums & Types ──────────────────────────────────────────────────────────
+export type JobSector = "public" | "private" | "military" | "retired";
+export type LoanCategory = "consumer" | "mortgage";
+export type EmployeeType = "employee" | "retiree"; // kept for legacy
 
 export interface LoanInputs {
   salary: number;
@@ -8,10 +10,29 @@ export interface LoanInputs {
   loanAmount: number;
   annualRate: number;
   durationMonths: number;
-  employeeType: EmployeeType;
-  sectorType: SectorType;
-  mortgageMode: boolean;
+  jobSector: JobSector;
+  loanCategory: LoanCategory;
+  isFirstHome?: boolean;
   adminFeeRate?: number;
+  // Legacy compat
+  employeeType?: EmployeeType;
+  sectorType?: "public" | "private";
+  mortgageMode?: boolean;
+}
+
+export interface AmortizationEntry {
+  month: number;
+  payment: number;
+  principal: number;
+  interest: number;
+  balance: number;
+}
+
+export interface SAMAViolation {
+  code: string;
+  severity: "error" | "warning";
+  messageAr: string;
+  messageEn: string;
 }
 
 export interface LoanResults {
@@ -23,48 +44,72 @@ export interface LoanResults {
   maxEligibleAmount: number;
   dsrRatio: number;
   dsrLimit: number;
+  maxTermMonths: number;
   isDsrCompliant: boolean;
+  isTermCompliant: boolean;
+  isFullyCompliant: boolean;
+  violations: SAMAViolation[];
   principalPercentage: number;
   interestPercentage: number;
   amortizationSchedule: AmortizationEntry[];
-  sectorType: SectorType;
-  mortgageMode: boolean;
+  jobSector: JobSector;
+  loanCategory: LoanCategory;
+  isFirstHome: boolean;
 }
 
-export interface AmortizationEntry {
-  month: number;
-  payment: number;
-  principal: number;
-  interest: number;
-  balance: number;
-}
-
-// ── DSR Limits ────────────────────────────────────────────────────────────
-// SAMA rules:
-//   • Retirees → always 25% regardless of sector
-//   • Private sector employees → 33.33%
-//   • Public sector employees (standard) → 33.33%
-//   • Public sector employees (mortgage/advanced) → 45%
-export const DSR_LIMITS = {
-  employee: 33.33,
-  retiree: 25.0,
-  publicMortgage: 45.0,
+// ── SAMA Rule Constants ────────────────────────────────────────────────────
+export const SAMA_RULES = {
+  consumer: {
+    maxTermMonths: 60,
+    dsrLimits: {
+      public:   33.33,
+      private:  33.33,
+      military: 33.33,
+      retired:  25.0,
+    },
+  },
+  mortgage: {
+    maxTermMonths: 360,
+    dsrLimits: {
+      // Standard mortgage
+      public:   55.0,
+      private:  55.0,
+      military: 60.0,
+      retired:  45.0,
+    },
+    dsrLimitsFirstHome: {
+      public:   65.0,
+      private:  65.0,
+      military: 65.0,
+      retired:  50.0,
+    },
+  },
 } as const;
-
-export function getDSRLimit(
-  employeeType: EmployeeType,
-  sectorType: SectorType,
-  mortgageMode: boolean
-): number {
-  if (employeeType === "retiree") return DSR_LIMITS.retiree;
-  if (sectorType === "public" && mortgageMode) return DSR_LIMITS.publicMortgage;
-  return DSR_LIMITS.employee;
-}
 
 export const MAX_ADMIN_FEE_SAR = 5000;
 export const DEFAULT_ADMIN_FEE_RATE = 0.01;
-export const MAX_CONSUMER_LOAN_MONTHS = 60;
 
+// ── DSR Limit Lookup ───────────────────────────────────────────────────────
+export function getDSRLimit(
+  jobSector: JobSector,
+  loanCategory: LoanCategory,
+  isFirstHome = false
+): number {
+  if (loanCategory === "consumer") {
+    return SAMA_RULES.consumer.dsrLimits[jobSector];
+  }
+  return isFirstHome
+    ? SAMA_RULES.mortgage.dsrLimitsFirstHome[jobSector]
+    : SAMA_RULES.mortgage.dsrLimits[jobSector];
+}
+
+export function getMaxTerm(loanCategory: LoanCategory): number {
+  return loanCategory === "consumer"
+    ? SAMA_RULES.consumer.maxTermMonths
+    : SAMA_RULES.mortgage.maxTermMonths;
+}
+
+// ── Core Calculations ──────────────────────────────────────────────────────
 export function calculateAdminFee(loanAmount: number, feeRate = DEFAULT_ADMIN_FEE_RATE): number {
   return Math.min(loanAmount * feeRate, MAX_ADMIN_FEE_SAR);
 }
@@ -109,7 +154,6 @@ export function buildAmortizationSchedule(
   const payment = calculateMonthlyPayment(principal, annualRate, months);
   const schedule: AmortizationEntry[] = [];
   let balance = principal;
-
   for (let m = 1; m <= months; m++) {
     const interestPaid = balance * r;
     const principalPaid = payment - interestPaid;
@@ -130,22 +174,81 @@ export function calculateMaxEligibleAmount(
   existingObligations: number,
   annualRate: number,
   months: number,
-  employeeType: EmployeeType,
-  sectorType: SectorType = "private",
-  mortgageMode = false
+  jobSector: JobSector,
+  loanCategory: LoanCategory,
+  isFirstHome = false
 ): number {
-  const limit = getDSRLimit(employeeType, sectorType, mortgageMode) / 100;
+  const limit = getDSRLimit(jobSector, loanCategory, isFirstHome) / 100;
   const maxMonthlyPayment = salary * limit - existingObligations;
   if (maxMonthlyPayment <= 0) return 0;
-
   const r = annualRate / 100 / 12;
   if (r === 0) return maxMonthlyPayment * months;
-
   const maxPrincipal = (maxMonthlyPayment * (Math.pow(1 + r, months) - 1)) /
     (r * Math.pow(1 + r, months));
   return Math.max(0, Math.floor(maxPrincipal));
 }
 
+// ── SAMA Compliance Engine ─────────────────────────────────────────────────
+export function checkSAMACompliance(inputs: LoanInputs): SAMAViolation[] {
+  const {
+    salary,
+    monthlyObligations,
+    loanAmount,
+    annualRate,
+    durationMonths,
+    jobSector,
+    loanCategory,
+    isFirstHome = false,
+  } = inputs;
+
+  const violations: SAMAViolation[] = [];
+  const dsrLimit = getDSRLimit(jobSector, loanCategory, isFirstHome);
+  const maxTerm = getMaxTerm(loanCategory);
+
+  // 1. Duration check
+  if (durationMonths > maxTerm) {
+    violations.push({
+      code: "TERM_EXCEEDED",
+      severity: "error",
+      messageAr: `مدة التمويل تتجاوز الحد المسموح (${maxTerm} شهراً) وفق أنظمة ساما`,
+      messageEn: `Loan term exceeds the SAMA maximum of ${maxTerm} months for ${loanCategory} finance`,
+    });
+  }
+
+  // 2. DSR check (only when salary and loan are provided)
+  if (salary > 0 && loanAmount > 0 && annualRate > 0 && durationMonths > 0) {
+    const effectiveDur = Math.min(durationMonths, maxTerm);
+    const installment = calculateMonthlyPayment(loanAmount, annualRate, effectiveDur);
+    const totalObl = monthlyObligations + installment;
+    const dsr = (totalObl / salary) * 100;
+    if (dsr > dsrLimit) {
+      violations.push({
+        code: "DSR_EXCEEDED",
+        severity: "error",
+        messageAr: `نسبة الاستقطاع (${dsr.toFixed(1)}%) تتجاوز الحد المسموح (${dsrLimit}%) وفق أنظمة ساما`,
+        messageEn: `Debt service ratio (${dsr.toFixed(1)}%) exceeds SAMA limit (${dsrLimit}%) for this sector`,
+      });
+    }
+  }
+
+  // 3. Admin fee note (warning, not a block)
+  if (loanAmount > 0) {
+    const adminFee = calculateAdminFee(loanAmount);
+    const actualRate = adminFee / loanAmount;
+    if (actualRate < 0.01 - 0.0001) {
+      violations.push({
+        code: "ADMIN_FEE_CAPPED",
+        severity: "warning",
+        messageAr: `رسوم الإدارة محدودة بـ 5,000 ريال وفق أنظمة ساما (بدلاً من 1%)`,
+        messageEn: `Admin fee capped at SAR 5,000 per SAMA regulation (instead of 1%)`,
+      });
+    }
+  }
+
+  return violations;
+}
+
+// ── Main Calculate ─────────────────────────────────────────────────────────
 export function calculate(inputs: LoanInputs): LoanResults {
   const {
     salary,
@@ -153,32 +256,38 @@ export function calculate(inputs: LoanInputs): LoanResults {
     loanAmount,
     annualRate,
     durationMonths,
-    employeeType,
-    sectorType,
-    mortgageMode,
+    jobSector,
+    loanCategory,
+    isFirstHome = false,
     adminFeeRate = DEFAULT_ADMIN_FEE_RATE,
   } = inputs;
 
-  const dsrLimit = getDSRLimit(employeeType, sectorType, mortgageMode);
+  const dsrLimit = getDSRLimit(jobSector, loanCategory, isFirstHome);
+  const maxTermMonths = getMaxTerm(loanCategory);
+  const effectiveDur = Math.min(durationMonths, maxTermMonths);
 
   const adminFee = calculateAdminFee(loanAmount, adminFeeRate);
-  const monthlyInstallment = calculateMonthlyPayment(loanAmount, annualRate, durationMonths);
-  const totalRepayment = monthlyInstallment * durationMonths;
+  const monthlyInstallment = calculateMonthlyPayment(loanAmount, annualRate, effectiveDur);
+  const totalRepayment = monthlyInstallment * effectiveDur;
   const totalInterest = totalRepayment - loanAmount;
-  const effectiveAPR = calculateAPR(loanAmount, monthlyInstallment, durationMonths, adminFee);
+  const effectiveAPR = calculateAPR(loanAmount, monthlyInstallment, effectiveDur, adminFee);
 
   const maxEligibleAmount = calculateMaxEligibleAmount(
-    salary, monthlyObligations, annualRate, durationMonths, employeeType, sectorType, mortgageMode
+    salary, monthlyObligations, annualRate, effectiveDur, jobSector, loanCategory, isFirstHome
   );
 
   const totalObligation = monthlyObligations + monthlyInstallment;
   const dsrRatio = salary > 0 ? (totalObligation / salary) * 100 : 0;
   const isDsrCompliant = dsrRatio <= dsrLimit;
+  const isTermCompliant = durationMonths <= maxTermMonths;
+
+  const violations = checkSAMACompliance(inputs);
+  const errorViolations = violations.filter(v => v.severity === "error");
+  const isFullyCompliant = errorViolations.length === 0;
 
   const principalPercentage = totalRepayment > 0 ? (loanAmount / totalRepayment) * 100 : 100;
-  const interestPercentage = 100 - principalPercentage;
 
-  const amortizationSchedule = buildAmortizationSchedule(loanAmount, annualRate, durationMonths);
+  const amortizationSchedule = buildAmortizationSchedule(loanAmount, annualRate, effectiveDur);
 
   return {
     monthlyInstallment: Number(monthlyInstallment.toFixed(2)),
@@ -189,15 +298,21 @@ export function calculate(inputs: LoanInputs): LoanResults {
     maxEligibleAmount,
     dsrRatio: Number(dsrRatio.toFixed(2)),
     dsrLimit,
+    maxTermMonths,
     isDsrCompliant,
+    isTermCompliant,
+    isFullyCompliant,
+    violations,
     principalPercentage: Number(principalPercentage.toFixed(1)),
-    interestPercentage: Number(interestPercentage.toFixed(1)),
+    interestPercentage: Number((100 - principalPercentage).toFixed(1)),
     amortizationSchedule,
-    sectorType,
-    mortgageMode,
+    jobSector,
+    loanCategory,
+    isFirstHome,
   };
 }
 
+// ── Formatting ─────────────────────────────────────────────────────────────
 export function formatSAR(amount: number, decimals = 2): string {
   return new Intl.NumberFormat("en-SA", {
     style: "currency",
