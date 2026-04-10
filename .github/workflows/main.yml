@@ -1,0 +1,40 @@
+name: Build iOS App
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-14 # أحدث إصدار متوفر لسيرفرات الماك
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install Dependencies
+        run: |
+          npm install -g pnpm
+          pnpm install --no-frozen-lockfile
+        
+      - name: Build Web Assets (Loan Calc)
+        run: |
+          cd artifacts/loan-cal
+          PORT=3000 BASE_PATH="/" API_URL="localhost" npx vite build
+          cd ../..
+          mkdir -p dist
+          cp -r artifacts/loan-cal/dist/public/* ./dist/
+          
+      - name: Capacitor Sync
+        run: npx cap sync ios
+        
+      - name: Xcode Build (Check)
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+                     -scheme App \
+                     -sdk iphoneos \
+                     -configuration Release \
+                     archive -archivePath App.xcarchive \
+                     CODE_SIGNING_ALLOWED=NO
