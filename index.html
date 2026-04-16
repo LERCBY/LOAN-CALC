@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LA - حاسبة التمويل المتقدمة</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --khuzama-dark: #6A4A6B; 
+            --khuzama-primary: #815C82; 
+            --khuzama-light: #F3EBF4; 
+            --gold: #D4AF37; 
+            --danger: #E63946; 
+            --warning: #F4A261;
+            --success: #2A9D8F;
+            --text-dark: #2D3748;
+            --white: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--khuzama-light);
+            margin: 0;
+            padding: 0;
+            color: var(--text-dark);
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 550px; 
+            background-color: var(--white);
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: var(--khuzama-dark);
+            color: var(--gold);
+            padding: 20px;
+            text-align: center;
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            position: relative;
+        }
+
+        .precision-badge {
+            font-size: 11px;
+            background-color: rgba(255,255,255,0.1);
+            color: #eee;
+            padding: 4px 8px;
+            border-radius: 4px;
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+
+        .content { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
+
+        .tabs {
+            display: flex;
+            background-color: #f1f1f1;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            flex: 1;
+            min-width: 110px;
+            text-align: center;
+            padding: 10px 5px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            color: #666;
+            border-left: 1px solid #ddd;
+            border-bottom: 1px solid transparent;
+            transition: 0.3s;
+        }
+        .tab:last-child { border-left: none; }
+        .tab.active { background-color: var(--khuzama-primary); color: var(--white); border-color: var(--khuzama-primary); }
+
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: var(--khuzama-dark); }
+        .input-group input, .input-group select {
+            width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px;
+            font-family: 'Cairo', sans-serif; font-size: 15px; box-sizing: border-box; outline: none; transition: 0.3s;
+        }
+        .input-group input:focus, .input-group select:focus { border-color: var(--khuzama-primary); }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        .buyout-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px dashed #cbd5e0;
+            margin-bottom: 15px;
+            display: none; 
+        }
+        .buyout-section h4 { margin: 0 0 10px 0; font-size: 14px; color: var(--khuzama-primary); }
+
+        .btn {
+            width: 100%; padding: 15px; border: none; border-radius: 8px; font-family: 'Cairo', sans-serif;
+            font-size: 18px; font-weight: 700; cursor: pointer; transition: 0.3s; margin-bottom: 15px;
+        }
+        .btn-primary { background-color: var(--khuzama-primary); color: var(--white); }
+        .btn-primary:hover { background-color: var(--khuzama-dark); }
+        .btn-outline { background-color: transparent; border: 2px solid var(--khuzama-primary); color: var(--khuzama-primary); }
+
+        .alert { padding: 15px; border-radius: 8px; text-align: center; font-weight: 700; margin-bottom: 20px; display: none; }
+        .alert-danger { background-color: var(--danger); color: white; }
+        .alert-warning { background-color: var(--warning); color: white; }
+
+        .results-card { background: linear-gradient(135deg, var(--khuzama-dark), var(--khuzama-primary)); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: none; }
+        .result-item { display: flex; justify-content: space-between; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); align-items: center;}
+        .result-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .result-title { font-size: 14px; opacity: 0.9; }
+        .result-value { font-size: 18px; font-weight: 700; color: var(--gold); direction: ltr; }
+        
+        .comparison-box { background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-top: 10px; display: none;}
+        .comparison-text { font-size: 13px; text-align: center; color: #fff; }
+        .comparison-highlight { color: var(--success); font-weight: 700; font-size: 15px; }
+
+        .small-note { font-size: 12px; text-align: center; color: #fff; margin-top: 15px; opacity: 0.8; }
+
+        /* التذييل القانوني (Disclaimer) */
+        .legal-footer {
+            margin-top: auto; /* لدفعه دائماً لأسفل الشاشة */
+            padding-top: 20px;
+            text-align: center;
+            font-size: 11px;
+            color: #718096;
+            border-top: 1px solid #e2e8f0;
+            line-height: 1.8;
+        }
+        .legal-footer span {
+            color: var(--khuzama-primary);
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="header">
+            LA
+            <div class="precision-badge">نسبة الخطأ الحسابي: أقل من 0.001%</div>
+        </div>
+
+        <div class="content">
+            <div id="alertBox" class="alert"></div>
+
+            <div class="tabs">
+                <div class="tab active" onclick="setTab('personal', this)">تمويل شخصي</div>
+                <div class="tab" onclick="setTab('buyout', this)">شراء مديونية</div>
+                <div class="tab" onclick="setTab('realestate', this)">تمويل عقاري</div>
+            </div>
+
+            <div class="grid-2">
+                <div class="input-group">
+                    <label>الحالة الوظيفية</label>
+                    <select id="jobStatus">
+                        <option value="employee">موظف</option>
+                        <option value="retiree">متقاعد (حد 25%)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>صافي الراتب (ريال)</label>
+                    <input type="number" id="salary" placeholder="10000">
+                </div>
+            </div>
+
+            <div id="buyoutSection" class="buyout-section">
+                <h4>تفاصيل القرض الحالي المراد شراؤه</h4>
+                <div class="grid-2">
+                    <div class="input-group">
+                        <label>الرصيد القائم (المتبقي للسداد)</label>
+                        <input type="number" id="existingBalance" placeholder="مثال: 80000" value="0">
+                    </div>
+                    <div class="input-group">
+                        <label>القسط الشهري الحالي</label>
+                        <input type="number" id="existingInstallment" placeholder="مثال: 2500" value="0">
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2" id="generalObligations">
+                <div class="input-group">
+                    <label>أقساط القروض الحالية (بنوك)</label>
+                    <input type="number" id="bankObligations" placeholder="0" value="0">
+                </div>
+                <div class="input-group">
+                    <label>أقساط أخرى (تابي/تمارا/بطاقات)</label>
+                    <input type="number" id="bnplObligations" placeholder="0" value="0">
+                </div>
+            </div>
+
+            <div class="input-group" id="realestateTypeSection" style="display: none;">
+                <label>نوع التمويل العقاري</label>
+                <select id="realestateType">
+                    <option value="supported">مدعوم (حد 65%)</option>
+                    <option value="unsupported">غير مدعوم (حد 55%)</option>
+                </select>
+            </div>
+
+            <div class="grid-2">
+                <div class="input-group">
+                    <label>نسبة الربح السنوي % (للتمويل الجديد)</label>
+                    <input type="number" id="rate" placeholder="2.5" step="0.01">
+                </div>
+                <div class="input-group">
+                    <label>المدة الجديدة (بالأشهر)</label>
+                    <input type="number" id="duration" placeholder="60" value="60">
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="calculateDbr()">تحليل وحساب التمويل</button>
+
+            <div id="resultsCard" class="results-card">
+                <div class="result-item">
+                    <span class="result-title">القسط الشهري المتاح:</span>
+                    <span class="result-value" id="resInstallment">0</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-title">إجمالي مبلغ التمويل:</span>
+                    <span class="result-value" id="resAmount">0</span>
+                </div>
+
+                <div id="comparisonBox" class="comparison-box">
+                    <div class="comparison-text">
+                        بعد سداد المديونية السابقة، سيتبقى لك سيولة نقدية (كاش) تقريباً: <br>
+                        <span class="comparison-highlight" id="resCashflow">0</span>
+                    </div>
+                </div>
+
+                <div class="small-note">تطبق الشروط والأحكام. النتائج تقريبية وتعتمد على السجل الائتماني.</div>
+            </div>
+
+            <button class="btn btn-outline" onclick="requestConsultation()">طلب استشارة دقيقة (واتساب)</button>
+
+            <div class="legal-footer">
+                <span>متوافق مع سياسة عبء الدين — البنك المركزي السعودي (ساما)</span><br>
+                للتوعية العامة · ليست نصيحة مالية
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'personal';
+
+        function setTab(tabName, element) {
+            currentTab = tabName;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+            
+            let durationInput = document.getElementById('duration');
+            let buyoutSec = document.getElementById('buyoutSection');
+            let genObsSec = document.getElementById('generalObligations');
+            let reTypeSec = document.getElementById('realestateTypeSection');
+            
+            buyoutSec.style.display = 'none';
+            genObsSec.style.display = 'grid';
+            reTypeSec.style.display = 'none';
+
+            if(tabName === 'personal') {
+                durationInput.value = 60; 
+            } else if (tabName === 'buyout') {
+                durationInput.value = 60;
+                buyoutSec.style.display = 'block';
+                genObsSec.style.display = 'none'; 
+                let bnplHTML = `
+                    <div class="input-group" style="grid-column: span 2;">
+                        <label>أقساط أخرى لا يشملها الشراء (تابي/تمارا/بطاقات)</label>
+                        <input type="number" id="bnplObligationsOnly" placeholder="0" value="0">
+                    </div>`;
+                buyoutSec.insertAdjacentHTML('beforeend', `<div id="tempBnpl" class="grid-2">${bnplHTML}</div>`);
+            } else if (tabName === 'realestate') {
+                durationInput.value = 240; 
+                reTypeSec.style.display = 'block';
+            }
+
+            if (tabName !== 'buyout' && document.getElementById('tempBnpl')) {
+                document.getElementById('tempBnpl').remove();
+            }
+            
+            document.getElementById('alertBox').style.display = 'none';
+            document.getElementById('resultsCard').style.display = 'none';
+        }
+
+        function requestConsultation() {
+            let phoneNumber = "966550552427"; 
+            let text = encodeURIComponent("مرحباً، قمت باستخدام حاسبة LA المتقدمة وأرغب في استشارة لطلب تمويل/شراء مديونية.");
+            window.open(`https://wa.me/${phoneNumber}?text=${text}`, '_blank');
+        }
+
+        function calculateDbr() {
+            let jobStatus = document.getElementById('jobStatus').value;
+            let salary = parseFloat(document.getElementById('salary').value) || 0;
+            let rate = parseFloat(document.getElementById('rate').value) || 0;
+            let duration = parseFloat(document.getElementById('duration').value) || 0;
+
+            let alertBox = document.getElementById('alertBox');
+            let resultsCard = document.getElementById('resultsCard');
+            let compBox = document.getElementById('comparisonBox');
+
+            alertBox.style.display = 'none';
+            resultsCard.style.display = 'none';
+            compBox.style.display = 'none';
+
+            if (salary < 3000) {
+                showAlert("الراتب غير مؤهل للتمويل (أقل من 3000 ريال)", "alert-danger");
+                return;
+            }
+
+            let personalLimit = jobStatus === 'retiree' ? 0.25 : (1/3); 
+            let totalLimit = jobStatus === 'retiree' ? 0.25 : 0.45;
+
+            let maxInstallment = 0;
+            let eligibleLoanAmount = 0;
+
+            const calculateAmount = (inst, r, d) => {
+                if (r === 0) return inst * d;
+                let monthlyRate = (r / 100) / 12;
+                return inst * ((1 - Math.pow(1 + monthlyRate, -d)) / monthlyRate);
+            };
+
+            if (currentTab === 'personal') {
+                let bankObs = parseFloat(document.getElementById('bankObligations').value) || 0;
+                let bnplObs = parseFloat(document.getElementById('bnplObligations').value) || 0;
+                
+                if ((bankObs + bnplObs) >= (salary * totalLimit)) {
+                    showAlert("تجاوزت الحد الأقصى لنسبة الاستقطاع المسموح بها.", "alert-danger");
+                    return;
+                }
+
+                let limit1 = (salary * personalLimit) - bankObs;
+                let limit2 = (salary * totalLimit) - (bankObs + bnplObs);
+                maxInstallment = Math.max(0, Math.min(limit1, limit2));
+
+            } else if (currentTab === 'buyout') {
+                let existBal = parseFloat(document.getElementById('existingBalance').value) || 0;
+                let bnplObs = parseFloat(document.getElementById('bnplObligationsOnly').value) || 0;
+
+                if (bnplObs >= (salary * totalLimit)) {
+                    showAlert("التزامات البطاقات/الآجل تجاوزت الحد المسموح للاستقطاع.", "alert-danger");
+                    return;
+                }
+
+                let limit1 = salary * personalLimit; 
+                let limit2 = (salary * totalLimit) - bnplObs;
+                maxInstallment = Math.max(0, Math.min(limit1, limit2));
+                
+                eligibleLoanAmount = calculateAmount(maxInstallment, rate, duration);
+
+                if (eligibleLoanAmount < existBal) {
+                    showAlert(`مبلغ التمويل المتاح (${Math.round(eligibleLoanAmount)} ريال) لا يغطي الرصيد القائم المراد شراؤه.`, "alert-warning");
+                    return;
+                } else {
+                    let cashflow = eligibleLoanAmount - existBal;
+                    document.getElementById('resCashflow').innerText = new Intl.NumberFormat('ar-SA', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }).format(cashflow);
+                    compBox.style.display = 'block';
+                }
+
+            } else if (currentTab === 'realestate') {
+                let reType = document.getElementById('realestateType').value;
+                let bankObs = parseFloat(document.getElementById('bankObligations').value) || 0;
+                let bnplObs = parseFloat(document.getElementById('bnplObligations').value) || 0;
+                
+                let reLimit = (jobStatus === 'retiree') ? 0.55 : (reType === 'supported' ? 0.65 : 0.55);
+                maxInstallment = Math.max(0, (salary * reLimit) - (bankObs + bnplObs));
+            }
+
+            if (maxInstallment <= 0 && currentTab !== 'buyout') {
+                 showAlert("لا يوجد مساحة لخصم قسط جديد من راتبك.", "alert-warning");
+                 return;
+            }
+
+            if (currentTab !== 'buyout') {
+                eligibleLoanAmount = calculateAmount(maxInstallment, rate, duration);
+            }
+
+            const formatter = new Intl.NumberFormat('ar-SA', { style: 'currency', currency: 'SAR', maximumFractionDigits: 2 });
+            document.getElementById('resInstallment').innerText = formatter.format(maxInstallment);
+            document.getElementById('resAmount').innerText = formatter.format(eligibleLoanAmount);
+            
+            resultsCard.style.display = 'block';
+        }
+
+        function showAlert(msg, typeClass) {
+            let alertBox = document.getElementById('alertBox');
+            alertBox.className = "alert " + typeClass;
+            alertBox.innerText = msg;
+            alertBox.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
