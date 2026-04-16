@@ -115,7 +115,6 @@
         }
         .btn-primary { background-color: var(--khuzama-primary); color: var(--white); }
         .btn-primary:hover { background-color: var(--khuzama-dark); }
-        .btn-outline { background-color: transparent; border: 2px solid var(--khuzama-primary); color: var(--khuzama-primary); }
 
         .alert { padding: 15px; border-radius: 8px; text-align: center; font-weight: 700; margin-bottom: 20px; display: none; }
         .alert-danger { background-color: var(--danger); color: white; }
@@ -133,15 +132,15 @@
 
         .small-note { font-size: 12px; text-align: center; color: #fff; margin-top: 15px; opacity: 0.8; }
 
-        /* التذييل القانوني (Disclaimer) */
         .legal-footer {
-            margin-top: auto; /* لدفعه دائماً لأسفل الشاشة */
+            margin-top: auto; 
             padding-top: 20px;
             text-align: center;
             font-size: 11px;
             color: #718096;
             border-top: 1px solid #e2e8f0;
             line-height: 1.8;
+            padding-bottom: 20px;
         }
         .legal-footer span {
             color: var(--khuzama-primary);
@@ -246,8 +245,6 @@
                 <div class="small-note">تطبق الشروط والأحكام. النتائج تقريبية وتعتمد على السجل الائتماني.</div>
             </div>
 
-            <button class="btn btn-outline" onclick="requestConsultation()">طلب استشارة دقيقة (واتساب)</button>
-
             <div class="legal-footer">
                 <span>متوافق مع سياسة عبء الدين — البنك المركزي السعودي (ساما)</span><br>
                 للتوعية العامة · ليست نصيحة مالية
@@ -279,6 +276,11 @@
                 durationInput.value = 60;
                 buyoutSec.style.display = 'block';
                 genObsSec.style.display = 'none'; 
+                
+                // تنظيف التكرار المحتمل
+                let oldBnpl = document.getElementById('tempBnpl');
+                if (oldBnpl) oldBnpl.remove();
+
                 let bnplHTML = `
                     <div class="input-group" style="grid-column: span 2;">
                         <label>أقساط أخرى لا يشملها الشراء (تابي/تمارا/بطاقات)</label>
@@ -296,12 +298,6 @@
             
             document.getElementById('alertBox').style.display = 'none';
             document.getElementById('resultsCard').style.display = 'none';
-        }
-
-        function requestConsultation() {
-            let phoneNumber = "966550552427"; 
-            let text = encodeURIComponent("مرحباً، قمت باستخدام حاسبة LA المتقدمة وأرغب في استشارة لطلب تمويل/شراء مديونية.");
-            window.open(`https://wa.me/${phoneNumber}?text=${text}`, '_blank');
         }
 
         function calculateDbr() {
@@ -323,7 +319,8 @@
                 return;
             }
 
-            let personalLimit = jobStatus === 'retiree' ? 0.25 : (1/3); 
+            // نسب الاستقطاع بناءً على تعديلات المستخدم (33.33% شخصي، 45% إجمالي)
+            let personalLimit = jobStatus === 'retiree' ? 0.25 : (0.3333); 
             let totalLimit = jobStatus === 'retiree' ? 0.25 : 0.45;
 
             let maxInstallment = 0;
@@ -340,7 +337,7 @@
                 let bnplObs = parseFloat(document.getElementById('bnplObligations').value) || 0;
                 
                 if ((bankObs + bnplObs) >= (salary * totalLimit)) {
-                    showAlert("تجاوزت الحد الأقصى لنسبة الاستقطاع المسموح بها.", "alert-danger");
+                    showAlert("تجاوزت الحد الأقصى لنسبة الاستقطاع المسموح بها (45%).", "alert-danger");
                     return;
                 }
 
@@ -382,7 +379,7 @@
             }
 
             if (maxInstallment <= 0 && currentTab !== 'buyout') {
-                 showAlert("لا يوجد مساحة لخصم قسط جديد من راتبك.", "alert-warning");
+                 showAlert("لا يوجد مساحة لخصم قسط جديد من راتبك وفقاً لسياسة عبء الدين.", "alert-warning");
                  return;
             }
 
